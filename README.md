@@ -76,7 +76,6 @@ This will take a long time (1 to 2 days), so it might be good to run in it on a 
 In ``.BatchJobs.R`` you specify your cluster system:
 
 ```
-more .BatchJobs.R
 cluster.functions = makeClusterFunctionsSLURM(".BatchJobs.slurm.brew")
 ```
 
