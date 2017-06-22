@@ -71,7 +71,7 @@ do
 done
 ```
 
-This will take a long time (1 to 2 days), so it might be good to run in it on a computing cluster. This will produce 9 ``.Rdata`` files. Then run to plot the results:
+This will take a long time (1 to 2 days), so it might be good to run in it on a computing cluster. This will produce 9 ``.Rdata`` files. To plot the results:
 
 ```
 R -e "rmarkdown::render('Power.Rmd',params = list(num_regions = '15'))"
