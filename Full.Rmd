@@ -214,7 +214,7 @@ CovRegFC::plot_diagnostics(fit,"nu",num_par = 4)
 
 Plot differential correlation.
 
-```{r fig.height=6,fig.width=9}
+```{r fig.height=5,fig.width=8}
 p_cov_da = CovRegFC::plot_post_mean(fit,channel_names)
 p_cov_da
 ggsave(p_cov_da,filename = paste0("cov_short_vs_conventional_",num_regions,".pdf"),height = 4,width = 6)
@@ -229,7 +229,7 @@ ggsave(filename = paste0("full_connectivity_",num_regions,".pdf"),height = 4,wid
 
 ## Simulations from Correlation Matrix Prior
 
-* Distribution of $1000$ off-diagonal elements $R_{12}$ extracted from correlation matrix drawn from LKJ prior
+Distribution of $1000$ off-diagonal elements $R_{12}$ extracted from correlation matrix drawn from LKJ prior.
 
 ```{r fig.width=6, fig.height=3, echo=FALSE, warning=FALSE, message=FALSE}
 set.seed(1981)
