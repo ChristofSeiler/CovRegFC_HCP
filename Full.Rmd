@@ -201,7 +201,7 @@ submitJobs(reg)
 waitForJobs(reg,sleep = 360)
 res_list = reduceResultsList(reg)
 fit = res_list[[1]]
-save(fit,file = paste0("HCP_fit_",num_regions,".Rdata"))
+save(fit,file = paste0("fit_full_",num_regions,".Rdata"))
 ```
 
 Convergence diagnostics.

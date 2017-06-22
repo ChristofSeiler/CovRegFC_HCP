@@ -197,7 +197,7 @@ if(is.na(num_subjects)) {
 submitJobs(reg)
 waitForJobs(reg,sleep = 360)
 fit_list = reduceResultsList(reg)
-save(fit_list,file = paste0("fit_list_HCP_reduced_",num_regions,"_",num_subjects,"_",tp_per_subject,".Rdata"))
+save(fit_list,file = paste0("fit_list_low_",num_regions,"_",num_subjects,"_",tp_per_subject,".Rdata"))
 fit = fit_list[[1]]
 ```
 

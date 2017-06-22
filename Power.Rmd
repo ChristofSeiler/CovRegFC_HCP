@@ -31,14 +31,14 @@ num_regions = as.integer(params$num_regions)
 num_regions
 channel_names = paste0("R",1:num_regions)
 num_samples_seq = seq(20,160,20)
-load("fit_list_HCP_reduced_15_NA_167.Rdata")
+load("fit_list_low_15_NA_167.Rdata")
 fit_population = fit_list[[1]]
 coeff = CovRegFC::plot_coeff(fit_population,
                              response = channel_names,
                              alpha = 0.05/length(channel_names))
 compute_power = function(alpha) {
   df = lapply(num_samples_seq,function(n) {
-    load(paste0("fit_list_HCP_reduced_15_",n,"_167.Rdata"))
+    load(paste0("fit_list_low_15_",n,"_167.Rdata"))
     stats = lapply(fit_list,function(fit) {
       sc = CovRegFC::plot_coeff(fit,
                                 response = channel_names,
