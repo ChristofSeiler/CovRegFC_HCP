@@ -8,6 +8,8 @@ C. Seiler and S. Holmes,
 bioRxiv 2017
 ```
 
+## Installation
+
 To install ``CovRegFC``:
 
 ```
@@ -36,6 +38,8 @@ HCP_PTN820/node_timeseries/3T_HCP820_MSMAll_d15_ts2/*.txt
 HCP_PTN820/groupICA/groupICA_3T_HCP820_MSMAll_d15.ica/melodic_IC_sum.sum/*.png
 ```
 
+## Low-Dimensional Model
+
 To run low-dimensional model on 40 subjects (this will take about 20 to 25 minutes):
 
 ```
@@ -43,8 +47,26 @@ R -e "rmarkdown::render('Low_Dimensional.Rmd', \
 params = list(num_regions = '15',num_subjects = '40',tp_per_subject = 'Auto',num_samples = '1'))"
 ```
 
+## Full Model
+
 To run full model (this will take about 50 to 55 minutes):
 
 ```
 R -e "rmarkdown::render('Full.Rmd',params = list(num_regions = '15'))"
+```
+
+## Power Analysis
+
+To run the power analysis (this will take a long time 1 to 2 days, so it might be good to run in it on a computing cluster):
+
+```
+R -e "rmarkdown::render('Low_Dimensional.Rmd', \
+params = list(num_regions = '15',num_subjects = 'Inf',tp_per_subject = 'Auto',num_samples = '1'))"
+
+for num_subjects in `seq 20 20 160`
+do
+  echo num_subjects = $num_subjects
+  R -e "rmarkdown::render('Low_Dimensional.Rmd', \
+  params = list(num_regions = '15',num_subjects = '${num_subjects}',tp_per_subject = 'Auto',num_samples = '1'))"
+done
 ```
