@@ -57,7 +57,7 @@ R -e "rmarkdown::render('Full.Rmd',params = list(num_regions = '15'))"
 
 ## Power Analysis
 
-To run the power analysis (this will take a long time 1 to 2 days, so it might be good to run in it on a computing cluster):
+To run the power analysis:
 
 ```
 R -e "rmarkdown::render('Low_Dimensional.Rmd', \
@@ -70,3 +70,5 @@ do
   params = list(num_regions = '15',num_subjects = '${num_subjects}',tp_per_subject = 'Auto',num_samples = '1'))"
 done
 ```
+
+This will take a long time 1 to 2 days, so it might be good to run in it on a computing cluster.
