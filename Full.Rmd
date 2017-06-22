@@ -181,11 +181,11 @@ X = data.frame(intercept=rep(1,length(short)),short)
 # run it in batch mode
 log_name = paste0("HCP_",num_regions)
 reg = makeRegistry(id = log_name, file.dir = log_name)
-batchExport(reg, li = list(model = model,
-                           stan_data = stan_data,
-                           init_data_all = init_data_all,
-                           iter = 1000,
-                           num_chains = num_chains),
+batchExport(reg, li = list(YY = YY,
+                           X = X,
+                           N = N,
+                           scov_short_mean = scov_short_mean,
+                           scov_conventional_mean = scov_conventional_mean),
             overwrite = TRUE)
 fun = function(seed) {
   library(CovRegFC)
@@ -206,7 +206,7 @@ save(fit,file = paste0("fit_full_",num_regions,".Rdata"))
 
 Convergence diagnostics.
 
-```{r}
+```{r fig.height=5, fig.width=10}
 CovRegFC::plot_diagnostics(fit,"sigma",num_par = 4)
 CovRegFC::plot_diagnostics(fit,"Omega",num_par = 4)
 CovRegFC::plot_diagnostics(fit,"nu",num_par = 4)

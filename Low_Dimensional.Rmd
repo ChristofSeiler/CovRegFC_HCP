@@ -1,5 +1,5 @@
 ---
-title: "Low-Dimensinal Covariance Regression Applied to HCP Data"
+title: "Low-Dimensional Covariance Regression Applied to HCP Data"
 output: html_document
 author: Christof Seiler
 date: "`r Sys.Date()`"
@@ -181,8 +181,7 @@ fun = function(data) {
   library(CovRegFC)
   CovRegFC::covreg_low(data = data,
                        response = channel_names,
-                       condition = condition,
-                       participant = "Subject")
+                       condition = condition)
 }
 if(is.na(num_subjects)) {
   batchMap(reg, fun, ts_subject_info_subset)
