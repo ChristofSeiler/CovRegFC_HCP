@@ -71,4 +71,4 @@ do
 done
 ```
 
-This will take a long time 1 to 2 days, so it might be good to run in it on a computing cluster.
+This will take a long time (1 to 2 days), so it might be good to run in it on a computing cluster.
