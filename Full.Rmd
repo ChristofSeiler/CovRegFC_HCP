@@ -1,0 +1,262 @@
+---
+title: "Full Covariance Regression Applied to HCP Data"
+output: html_document
+author: Christof Seiler
+date: "`r Sys.Date()`"
+params:
+  num_regions: "15"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Goal
+
+Apply **full** covariance regression model to preprocessed timeseries data from the [Human Connectome Project](https://db.humanconnectome.org/data/projects/HCP_1200).
+
+```{r}
+library(CovRegFC)
+library(cowplot)
+library(ggplot2)
+library(reshape2)
+library(magrittr)
+library(stringr)
+library(devtools)
+library(rstan)
+library(abind)
+library(BatchJobs)
+library(reshape2)
+library(rethinking)
+```
+
+## Load HCP Data
+
+Analysis based on data from all 820 subjects in the S900 data release having four complete rfMRI runs (with 100% of collected timepoints), yielding the following outputs at 6 ICA dimensionalities: Group-average parcellations yielded by group-ICA, subject-specific parcellations, subject-specific node timeseries, and a set of subject-specific parcellated connectomes. 
+
+Load subject information and behavioral measurements.
+
+```{r}
+subject_info = read.csv("HCP_PTN820/sample_info.csv")
+subject_info = subject_info[,c(
+  "Subject",
+  "Age",
+  "Gender",
+  "Acquisition",
+  "PSQI_AmtSleep", # amount of sleep in hours
+  "PSQI_Score" # Pittsburgh Sleep Quality Index (PSQI) Completed
+  )] 
+```
+
+Classificatoin of sleep duration from Hirshkowitz et al. (2015)^[Hirshkowitz et al. (2015), National Sleep Foundation's sleep recommendations: Methodology and results summary, Sleep Health.]:
+
+* short sleepers: average equal or less than 6 hours each night
+* conventional sleepers: average between 7 and 9 hours each night
+
+```{r}
+sleep_duration = rep("undefined",nrow(subject_info))
+sleep_duration[subject_info$PSQI_AmtSleep <= 6] = "short"
+sleep_duration[(subject_info$PSQI_AmtSleep >= 7) & (subject_info$PSQI_AmtSleep <= 9)] = "conventional"
+subject_info$sleep_duration = factor(sleep_duration)
+table(subject_info$sleep_duration)
+str(subject_info)
+```
+
+Load timeseries.
+
+```{r}
+num_regions = as.integer(params$num_regions)
+num_regions
+channel_names = paste0("R",1:num_regions)
+path = paste0("HCP_PTN820/node_timeseries/3T_HCP820_MSMAll_d",num_regions,"_ts2")
+file_names = list.files(path = path,pattern = ".txt")
+file_subject_ids = strsplit(file_names,split = ".txt") %>% unlist
+ts = lapply(file_subject_ids,function(Subject) {
+  print(paste("reading subject:",Subject))
+  full_path = paste0(path,"/",Subject,".txt")
+  timeseries = read.csv(full_path,header = FALSE,sep = " ")
+  timeseries$Subject = Subject
+  timeseries
+}) %>% do.call(rbind,.) %>% data.frame
+names(ts)[1:num_regions] = channel_names
+```
+
+Merge timeseries and subject info into one data frame.
+
+```{r}
+ts_subject_info = merge(ts,subject_info,by = "Subject")
+```
+
+Plot timeseries for subject ``100206``.
+
+```{r}
+timeseries = subset(ts_subject_info,Subject == 100206)
+timeseries$timepoint = rep(1:(nrow(timeseries)/4),4)
+timeseries$run = lapply(paste0("run_",1:4),function(i) rep(i,nrow(timeseries)/4)) %>% unlist
+timeseries_long = melt(timeseries,id.vars = c("timepoint","run",names(subject_info)))
+ggplot(timeseries_long,aes(x = timepoint,y = value,color = variable)) + 
+  geom_line() + facet_wrap(~run)
+timeseries_long_subset = subset(timeseries_long,
+                                timepoint < 51 & (variable == "R1" | variable == "R2" | variable == "R3"))
+ggplot(timeseries_long_subset,aes(x = timepoint,y = value,color = variable)) + 
+  geom_line() + facet_wrap(~run)
+```
+
+Take a sample of 20 subjects.
+
+```{r}
+# set.seed(934321)
+# ts_subject_info = subset(ts_subject_info,sleep_duration == "short" | sleep_duration == "conventional")
+# subsample_size = 20
+# sampled_subjects = sample(names(table(ts_subject_info$Subject)),size = subsample_size)
+# ts_subject_info_subset = subset(ts_subject_info,Subject %in% sampled_subjects) %>% droplevels
+# str(ts_subject_info_subset)
+# table(ts_subject_info_subset$Subject)
+# table(ts_subject_info_subset$sleep_duration)/table(ts_subject_info_subset$Subject)[1]
+```
+
+Compute average covariance matrices per task/condition.
+
+```{r}
+subset_tasks = function(data,factor_name,level_name) {
+  data_subgroup = data[which(data[factor_name] == level_name),] %>% droplevels
+  region_ids = str_detect(names(ts_subject_info),"R") %>% which
+  subject_ids = table(data_subgroup$Subject) %>% names
+  scov = list()
+  K = length(subject_ids)
+  P = length(region_ids)
+  scov$YY = array(dim = c(K,P,P))
+  for(i in 1:K) {
+    Y = subset(data_subgroup,Subject == subject_ids[i])[,region_ids]
+    Y_c = scale(Y,center = TRUE,scale = FALSE)
+    scov$YY[i,,] = t(Y_c) %*% Y_c
+  }
+  scov$N = table(data_subgroup$Subject)
+  scov
+}
+#scov_short = subset_tasks(ts_subject_info_subset,"sleep_duration","short")
+scov_short = subset_tasks(ts_subject_info,"sleep_duration","short")
+#scov_conventional = subset_tasks(ts_subject_info_subset,"sleep_duration","conventional")
+scov_conventional = subset_tasks(ts_subject_info,"sleep_duration","conventional")
+```
+
+Plot average covariance matrices per task/condition.
+
+```{r}
+plot_cov = function(YY,limit_value) {
+  rownames(YY) = colnames(YY) = channel_names
+  get_upper_tri = function(mat) {
+    mat[lower.tri(mat)] = NA
+    mat
+  }
+  YY_long = melt(get_upper_tri(YY), na.rm = TRUE)
+  ggplot(data = YY_long, aes(Var2, Var1, fill = value)) +
+    geom_tile(color = "white") +
+    scale_fill_gradient2(low = "blue", high = "red", mid = "white",
+                         midpoint = 0, space = "Lab",
+                         limit = c(-limit_value,limit_value),
+                         name = "Covariance") +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 90, vjust = 1, hjust = 1),
+          axis.title.x=element_blank(),
+          axis.title.y=element_blank(),
+          legend.position="right") +
+    coord_fixed()
+}
+scov_short_mean = apply(scov_short$YY,MARGIN = c(2,3),FUN = mean)
+scov_conventional_mean = apply(scov_conventional$YY,MARGIN = c(2,3),FUN = mean)
+limit_value = max(abs(c(scov_short_mean[lower.tri(scov_short_mean)] %>% abs %>% max,
+                        scov_conventional_mean[lower.tri(scov_conventional_mean)] %>% abs %>% max)))
+plot_cov(scov_short_mean,limit_value)
+plot_cov(scov_conventional_mean,limit_value)
+```
+
+## Full Covariance Modeling
+
+```{r}
+YY = abind(scov_conventional$YY,scov_short$YY,along = 1)
+N = min(scov_conventional$N,scov_short$N)
+short = c(rep(0,length(scov_conventional$N)),rep(1,length(scov_short$N)))
+X = data.frame(intercept=rep(1,length(short)),short)
+# run it in batch mode
+log_name = paste0("HCP_",num_regions)
+reg = makeRegistry(id = log_name, file.dir = log_name)
+batchExport(reg, li = list(model = model,
+                           stan_data = stan_data,
+                           init_data_all = init_data_all,
+                           iter = 1000,
+                           num_chains = num_chains),
+            overwrite = TRUE)
+fun = function(seed) {
+  library(CovRegFC)
+  CovRegFC::covreg_full(YY = YY,
+                        X = X,
+                        N = N,
+                        scov_short_mean = scov_short_mean,
+                        scov_conventional_mean = scov_conventional_mean,
+                        seed = seed)
+}
+batchMap(reg, fun, 15324)
+submitJobs(reg)
+waitForJobs(reg,sleep = 360)
+res_list = reduceResultsList(reg)
+fit = res_list[[1]]
+save(fit,file = paste0("HCP_fit_",num_regions,".Rdata"))
+```
+
+Convergence diagnostics.
+
+```{r}
+CovRegFC::plot_diagnostics(fit,"sigma",num_par = 4)
+CovRegFC::plot_diagnostics(fit,"Omega",num_par = 4)
+CovRegFC::plot_diagnostics(fit,"nu",num_par = 4)
+```
+
+Plot differential correlation.
+
+```{r fig.height=6,fig.width=9}
+p_cov_da = CovRegFC::plot_post_mean(fit,channel_names)
+p_cov_da
+ggsave(p_cov_da,filename = paste0("cov_short_vs_conventional_",num_regions,".pdf"),height = 4,width = 6)
+```
+
+Differential analysis: shorter correlation stronger than conventional sleep duration correlations?
+
+```{r}
+CovRegFC::plot_corr_da(fit,channel_names,"Differential correlations in short vs. conventional")
+ggsave(filename = paste0("full_connectivity_",num_regions,".pdf"),height = 4,width = 5)
+```
+
+## Simulations from Correlation Matrix Prior
+
+* Distribution of $1000$ off-diagonal elements $R_{12}$ extracted from correlation matrix drawn from LKJ prior
+
+```{r fig.width=6, fig.height=3, echo=FALSE, warning=FALSE, message=FALSE}
+set.seed(1981)
+sim_corr = function(dimension,eta) {
+  R_all = rlkjcorr(1000, K = dimension , eta = eta)
+  data.frame(dimension = dimension,eta = eta,R_12 = R_all[,1,2])
+}
+combo = rbind(sim_corr(dimension = 2,eta = 0.01),
+              sim_corr(dimension = 2,eta = 1),
+              sim_corr(dimension = 2,eta = 4),
+              sim_corr(dimension = 15,eta = 0.01),
+              sim_corr(dimension = 15,eta = 1),
+              sim_corr(dimension = 15,eta = 4),
+              sim_corr(dimension = 50,eta = 0.01),
+              sim_corr(dimension = 50,eta = 1),
+              sim_corr(dimension = 50,eta = 4))
+combo$eta = as.factor(combo$eta)
+ggplot(data = combo,aes(x = R_12,color = eta)) +
+  geom_density(alpha = 1.0,size = 1) +
+  ggtitle("dimension") +
+  xlim(c(-1,1)) + 
+  facet_wrap(~ dimension)
+ggsave(filename = "LKJ_prior_simulations.pdf",width = 9,height = 3)
+```
+
+## Session Info
+
+```{r}
+session_info()
+```

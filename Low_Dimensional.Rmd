@@ -1,0 +1,246 @@
+---
+title: "Low-Dimensinal Covariance Regression Applied to HCP Data"
+output: html_document
+author: Christof Seiler
+date: "`r Sys.Date()`"
+params:
+  num_regions: "15"
+  num_subjects: "Inf"
+  tp_per_subject: "Auto"
+  num_samples: 100
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Goal
+
+Apply **low-dimensional** covariance regression model to preprocessed timeseries data from the [Human Connectome Project](https://db.humanconnectome.org/data/projects/HCP_1200).
+
+```{r}
+library(CovRegFC)
+library(cowplot)
+library(ggplot2)
+library(reshape2)
+library(magrittr)
+library(stringr)
+library(devtools)
+library(rstan)
+library(abind)
+library(png)
+library(cowplot)
+library(BatchJobs)
+library(coda)
+```
+
+## Load HCP Data
+
+Analysis based on data from all 820 subjects in the S900 data release having four complete rfMRI runs (with 100% of collected timepoints), yielding the following outputs at 6 ICA dimensionalities: Group-average parcellations yielded by group-ICA, subject-specific parcellations, subject-specific node timeseries, and a set of subject-specific parcellated connectomes. 
+
+Load subject information and behavioral measurements.
+
+```{r}
+subject_info = read.csv("HCP_PTN820/sample_info.csv")
+subject_info = subject_info[,c(
+  "Subject",
+  "Age",
+  "Gender",
+  "Acquisition",
+  "PSQI_AmtSleep", # amount of sleep in hours
+  "PSQI_Score" # Pittsburgh Sleep Quality Index (PSQI) Completed
+  )] 
+```
+
+Classificatoin of sleep duration from Hirshkowitz et al. (2015)^[Hirshkowitz et al. (2015), National Sleep Foundation's sleep recommendations: Methodology and results summary, Sleep Health.]:
+
+* short sleepers: average equal or less than 6 hours each night
+* conventional sleepers: average between 7 and 9 hours each night
+
+```{r}
+sleep_duration = rep("undefined",nrow(subject_info))
+sleep_duration[subject_info$PSQI_AmtSleep <= 6] = "short"
+sleep_duration[(subject_info$PSQI_AmtSleep >= 7) & (subject_info$PSQI_AmtSleep <= 9)] = "conventional"
+subject_info$sleep_duration = factor(sleep_duration)
+table(subject_info$sleep_duration)
+str(subject_info)
+```
+
+Load timeseries.
+
+```{r}
+num_regions = as.integer(params$num_regions)
+num_regions
+channel_names = paste0("R",1:num_regions)
+path = paste0("HCP_PTN820/node_timeseries/3T_HCP820_MSMAll_d",num_regions,"_ts2")
+file_names = list.files(path = path,pattern = ".txt")
+file_subject_ids = strsplit(file_names,split = ".txt") %>% unlist
+ts = lapply(file_subject_ids,function(Subject) {
+  print(paste("reading subject:",Subject))
+  full_path = paste0(path,"/",Subject,".txt")
+  timeseries = read.csv(full_path,header = FALSE,sep = " ")
+  timeseries$Subject = Subject
+  timeseries
+}) %>% do.call(rbind,.) %>% data.frame
+names(ts)[1:num_regions] = channel_names
+```
+
+Merge timeseries and subject info into one data frame.
+
+```{r}
+ts_subject_info = merge(ts,subject_info,by = "Subject")
+```
+
+Plot timeseries for one subject.
+
+```{r}
+subject_names = names(table(ts_subject_info$Subject))
+timeseries = subset(ts_subject_info,Subject == subject_names[1])
+timeseries$timepoint = rep(1:(nrow(timeseries)/4),4)
+timeseries$run = lapply(paste0("run_",1:4),function(i) rep(i,nrow(timeseries)/4)) %>% unlist
+timeseries_long = melt(timeseries,id.vars = c("timepoint","run",names(subject_info)))
+ggplot(timeseries_long,aes(x = timepoint,y = value,color = variable)) + 
+  geom_line() + facet_wrap(~run)
+timeseries_long_subset = subset(timeseries_long,
+                                timepoint < 51 & (variable == "R1" | variable == "R2" | variable == "R3"))
+ggplot(timeseries_long_subset,aes(x = timepoint,y = value,color = variable)) + 
+  geom_line() + facet_wrap(~run)
+```
+
+What is the effective samples size computed using autocorrelation function.
+
+```{r}
+run = cut_number(1:nrow(timeseries), 4, labels=FALSE)
+ess = lapply(subject_names,function(subject_name) {
+  sapply(1:4,function(i) {
+    timeseries = subset(ts_subject_info,Subject == subject_name)
+    Y = timeseries[run==i,channel_names]
+    effectiveSize(Y) %>% min
+  })  %>% sum
+}) %>% unlist
+df = data.frame(subject_id=1:length(ess),ess)
+ggplot(df,aes(ess)) + geom_histogram()
+tp_per_subject = round(min(df$ess))
+tp_per_subject
+```
+
+Subsample time points within each subject to account for dependencies.
+
+```{r}
+#tp_per_subject = as.integer(params$tp_per_subject)
+#tp_per_subject
+ts_subject_info_subset = subset(ts_subject_info,
+                                sleep_duration == "short" | sleep_duration == "conventional") %>% droplevels
+subject_names = names(table(ts_subject_info_subset$Subject))
+subsample_ids = lapply(subject_names,function(subject_name) {
+  ids = which(ts_subject_info_subset$Subject == subject_name)
+  seq(from = min(ids),to = max(ids),length.out = tp_per_subject) %>% floor
+}) %>% unlist
+ts_subject_info_subset = ts_subject_info_subset[subsample_ids,] %>% droplevels
+str(ts_subject_info_subset)
+table(ts_subject_info_subset$Subject)
+ct = table(ts_subject_info_subset[,c("Acquisition","sleep_duration")])/tp_per_subject
+addmargins(ct)
+```
+
+Subsample subject for power curve.
+
+```{r}
+subsample_subjects = function(ts_subject_info_subset,
+                              num_subjects,
+                              seed = 934321) {
+  set.seed(seed)
+  total_samples = table(ts_subject_info_subset$sleep_duration)/table(ts_subject_info_subset$Subject)[1]
+  num_subject_short = ceiling(num_subjects * total_samples["short"] / sum(total_samples))
+  num_subject_conventional = num_subjects-num_subject_short
+  short_names = subset(ts_subject_info_subset,sleep_duration == "short")$Subject %>%
+    table %>% names %>% sample(.,num_subject_short)
+  conventional_names = subset(ts_subject_info_subset,sleep_duration == "conventional")$Subject %>%
+    table %>% names %>% sample(.,num_subject_conventional)
+  subject_names = c(short_names,conventional_names)
+  ts_subject_info_subset[ts_subject_info_subset$Subject %in% subject_names,]
+}
+```
+
+## Low-Dimensional Covariance Modeling
+
+We can account for correlation between the error terms of the multivariate response variable using covariance regression model. This model is very similar to "seemingly unrelated regressions" (see Zellner^[Zellner (1962), An efficient method of estimating seemingly unrelated regression equations and tests for aggregation bias, JASA.] and Greene^[Greene (2011), Econometric Analysis.]) with an additional random effects term. Repeat many times for power curve.
+
+```{r}
+condition = "sleep_duration"
+ts_subject_info_subset = within(ts_subject_info_subset,
+                                sleep_duration <- relevel(sleep_duration, ref = "conventional"))
+num_subjects = as.integer(params$num_subjects)
+num_samples = as.integer(params$num_samples)
+log_name = paste0("HCP_Restricted_",num_regions,"_",num_subjects,"_",tp_per_subject)
+reg = makeRegistry(id = log_name, file.dir = log_name)
+batchExport(reg, li = list(channel_names = channel_names,
+                           condition = condition,
+                           overwrite = TRUE))
+fun = function(data) {
+  library(CovRegFC)
+  CovRegFC::covreg_low(data = data,
+                       response = channel_names,
+                       condition = condition,
+                       participant = "Subject")
+}
+if(is.na(num_subjects)) {
+  batchMap(reg, fun, ts_subject_info_subset)
+} else {
+  data = lapply(1:num_samples,function(seed) {
+    subsample_subjects(ts_subject_info_subset,
+                       num_subjects = num_subjects,
+                       seed = seed)
+  })
+  batchMap(reg, fun, data)
+}
+submitJobs(reg)
+waitForJobs(reg,sleep = 360)
+fit_list = reduceResultsList(reg)
+save(fit_list,file = paste0("fit_list_HCP_reduced_",num_regions,"_",num_subjects,"_",tp_per_subject,".Rdata"))
+fit = fit_list[[1]]
+```
+
+Traceplots to assess convergence of HMC sampler.
+
+```{r fig.height=5, fig.width=10}
+CovRegFC::plot_diagnostics(fit,par_name = "sigma",num_par = 8)
+CovRegFC::plot_diagnostics(fit,par_name = "B",num_par = 8)
+```
+
+## Visualize Results
+
+Plot regions.
+
+```{r}
+path = paste0("HCP_PTN820/groupICA/groupICA_3T_HCP820_MSMAll_d",num_regions,".ica/melodic_IC_sum.sum")
+pngs = list.files(path = path,pattern = ".png")
+full_paths = paste(path,pngs,sep = "/")
+ps = lapply(1:length(full_paths),function(i) 
+  CovRegFC::plot_brain(full_paths[i],title = paste0("R",i))
+)
+p_brains = do.call(plot_grid,c(ps,nrow = 2))
+p_brains
+ggsave(p_brains,filename = paste0("brains_",num_regions,".pdf"),width = 9,height = 3)
+```
+
+Analyze posterior covariance **explained** by simulation conditions.
+
+```{r fig.height=5, fig.width=10}
+condition_names = ts_subject_info_subset[,condition] %>% contrasts %>% rownames %>% rev
+title = paste(condition_names,collapse = " vs. ")
+p_brain_coeff = CovRegFC::plot_coeff(fit,
+                                     response = channel_names,
+                                     alpha = 0.05/length(channel_names),
+                                     title = title,
+                                     brain_slices = full_paths)
+p_brain_coeff
+ggsave(p_brain_coeff,filename = paste0("brains_coeff_",num_regions,"_",num_subjects,"_",tp_per_subject,".pdf"),
+       height = 5,width = 10)
+```
+
+## Session Info
+
+```{r}
+session_info()
+```

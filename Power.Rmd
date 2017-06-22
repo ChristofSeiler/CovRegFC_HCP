@@ -1,0 +1,80 @@
+---
+title: "Power Analysis of Low-Dimensinal Model"
+output: html_document
+author: Christof Seiler
+date: "`r Sys.Date()`"
+params:
+  num_regions: "15"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Goal
+
+Power analysis of **low-dimensional** covariance regression model. Run this script after ``Low_Dimensional.Rmd``.
+
+```{r}
+library(CovRegFC)
+library(ggplot2)
+library(magrittr)
+library(reshape2)
+library(devtools)
+library(cowplot)
+```
+
+## Power Analysis
+
+```{r}
+num_regions = as.integer(params$num_regions)
+num_regions
+channel_names = paste0("R",1:num_regions)
+num_samples_seq = seq(20,160,20)
+load("fit_list_HCP_reduced_15_NA_167.Rdata")
+fit_population = fit_list[[1]]
+coeff = CovRegFC::plot_coeff(fit_population,
+                             response = channel_names,
+                             alpha = 0.05/length(channel_names))
+compute_power = function(alpha) {
+  df = lapply(num_samples_seq,function(n) {
+    load(paste0("fit_list_HCP_reduced_15_",n,"_167.Rdata"))
+    stats = lapply(fit_list,function(fit) {
+      sc = CovRegFC::plot_coeff(fit,
+                                response = channel_names,
+                                alpha = alpha)
+      # True Positive Rate (TPR)
+      P = length(unlist(coeff))
+      TP1 = sum(sc$set1 %in% coeff$set1) + sum(sc$set2 %in% coeff$set2)
+      TP2 = sum(sc$set1 %in% coeff$set2) + sum(sc$set2 %in% coeff$set1)
+      TPR = max(TP1,TP2)/P
+      # False Discovery Rate (FDR)
+      FP1 = sum(!sc$set1 %in% coeff$set1) + sum(!sc$set2 %in% coeff$set2)
+      FP2 = sum(!sc$set1 %in% coeff$set2) + sum(!sc$set2 %in% coeff$set1)
+      FDR = min(FP1,FP2)/(max(TP1,TP2)+min(FP1,FP2))
+      if(is.na(FDR)) FDR = 0
+      c(TPR = TPR,FDR = FDR)
+    }) %>% do.call(rbind,.) %>% data.frame
+    c(n = n,TPR = mean(stats$TPR),FDR = mean(stats$FDR))
+  }) %>% do.call(rbind,.) %>% data.frame
+  data.frame(df,alpha)
+}
+alpha_seq = c(0.001,0.01,0.1)
+df_list = lapply(alpha_seq,compute_power)
+df = df_list %>% do.call(rbind,.)
+df$alpha = as.factor(df$alpha)
+df_long = melt(df,id.vars = c("n","alpha"),value.name = "rate",variable.name = "statistic")
+ggplot(df_long,aes(x = n,y = rate,linetype = statistic,color = alpha)) + 
+  geom_point() + 
+  geom_line() +
+  scale_y_continuous(limits = c(0,1),breaks = seq(0,1,0.2)) + 
+  scale_x_continuous(breaks = df$n) +
+  ggtitle("Power Analysis")
+ggsave(filename = "power.pdf",width = 5,height = 5)
+```
+
+## Session Info
+
+```{r}
+session_info()
+```
