@@ -1,4 +1,4 @@
-# Multivariate Heteroscedasticity Models
+# Multivariate Heteroscedasticity Models for FC
 
 Low-dimensional and full covariance regression model applied to data from the Human Connectome Project (HCP) to compare functional brain connectivity between short and conventional sleepers. Before running the ``Rmd`` script, you need to install ``R`` package ``CovRegFC`` and download the data from HCP server.
 
