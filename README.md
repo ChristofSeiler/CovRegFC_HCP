@@ -8,11 +8,19 @@ To install ``CovRegFC``:
 R -e "devtools::install_github('ChristofSeiler/CovRegFC')
 ```
 
-Download HCP data and unzip in the same folder where you clone this repository.
+The HCP data is available in this repository in multipart zip file. To unzip:
 
 ```
-HCP_PTN820/node_timeseries/3T_HCP820_MSMAll_d15_ts2
-HCP_PTN820/groupICA/groupICA_3T_HCP820_MSMAll_d15.ica/melodic_IC_sum.sum
+zip -s 0 HCP_PTN820.zip --out unsplit-HCP_PTN820.zip
+unzip unsplit-HCP_PTN820.zip
+```
+
+You should see the following files and folders structure:
+
+```
+HCP_PTN820/sample_info.csv
+HCP_PTN820/node_timeseries/3T_HCP820_MSMAll_d15_ts2/*.txt
+HCP_PTN820/groupICA/groupICA_3T_HCP820_MSMAll_d15.ica/melodic_IC_sum.sum/*.png
 ```
 
 To run low-dimensional model:
