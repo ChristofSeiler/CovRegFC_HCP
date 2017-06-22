@@ -67,11 +67,37 @@ for num_subjects in `seq 20 20 160`
 do
   echo num_subjects = $num_subjects
   R -e "rmarkdown::render('Low_Dimensional.Rmd', \
-  params = list(num_regions = '15',num_subjects = '${num_subjects}',tp_per_subject = 'Auto',num_samples = '1'))"
+  params = list(num_regions = '15',num_subjects = '${num_subjects}',tp_per_subject = 'Auto',num_samples = '100'))"
 done
 ```
 
-This will take a long time (1 to 2 days), so it might be good to run in it on a computing cluster. This will produce 9 ``.Rdata`` files. To plot the results:
+This will take a long time (1 to 2 days), so it might be good to run in it on a computing cluster. We use the R package ``BatchJobs`` to parallelize. You can use it on your cluster by specifiying ``.BatchJobs.R`` and ``.BatchJobs.slurm.brew`` inside your cloned folder.
+
+In ``.BatchJobs.R`` you specify your cluster system:
+
+```
+more .BatchJobs.R
+cluster.functions = makeClusterFunctionsSLURM(".BatchJobs.slurm.brew")
+```
+
+In ``.BatchJobs.slurm.brew`` you specify required job resources:
+
+```
+#!/bin/bash
+
+#SBATCH --job-name=<%= job.name %>
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --mem-per-cpu=8GB
+#SBATCH --time=24:00:00
+#SBATCH --partition=normal
+
+## Run R:
+module load R/3.3.0
+R CMD BATCH --no-save --no-restore "<%= rscript %>" /dev/stdout
+```
+
+This will produce 9 ``.Rdata`` files. To plot the results:
 
 ```
 R -e "rmarkdown::render('Power.Rmd',params = list(num_regions = '15'))"
