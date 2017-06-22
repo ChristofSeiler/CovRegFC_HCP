@@ -71,4 +71,8 @@ do
 done
 ```
 
-This will take a long time (1 to 2 days), so it might be good to run in it on a computing cluster.
+This will take a long time (1 to 2 days), so it might be good to run in it on a computing cluster. This will produce a couple of ``.Rdata`` files with results. Now run:
+
+```
+R -e "rmarkdown::render('Power.Rmd',params = list(num_regions = '15'))"
+```
