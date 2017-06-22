@@ -40,7 +40,7 @@ To run low-dimensional model on 40 subjects (this will take about 20 to 25 minut
 
 ```
 R -e "rmarkdown::render('Low_Dimensional.Rmd', \
-params = list(num_regions = '15',num_subjects = 40,tp_per_subject = 'Auto',num_samples = '1'))"
+params = list(num_regions = '15',num_subjects = '40',tp_per_subject = 'Auto',num_samples = '1'))"
 ```
 
 To run full model (this will take about 50 to 55 minutes):
