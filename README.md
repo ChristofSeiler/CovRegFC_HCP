@@ -11,7 +11,7 @@ bioRxiv 2017
 To install ``CovRegFC``:
 
 ```
-R -e "devtools::install_github('ChristofSeiler/CovRegFC')
+R -e "devtools::install_github('ChristofSeiler/CovRegFC')"
 ```
 
 Then clone this repository:
