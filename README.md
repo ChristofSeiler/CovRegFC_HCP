@@ -1,6 +1,6 @@
 # Multivariate Heteroscedasticity Models for FC
 
-This is supplemnatry material for our paper:
+Low-dimensional and full covariance regression model applied to data from the Human Connectome Project (HCP) to compare functional brain connectivity between short and conventional sleepers. Before running the ``Rmd`` script, you need to install ``R`` package ``CovRegFC`` and download the data from HCP server. This is supplemnatry material for our paper:
 
 ```
 Multivariate Heteroscedasticity Models for Functional Brain Connectivity,
@@ -8,17 +8,22 @@ C. Seiler and S. Holmes,
 bioRxiv 2017
 ```
 
-Low-dimensional and full covariance regression model applied to data from the Human Connectome Project (HCP) to compare functional brain connectivity between short and conventional sleepers. Before running the ``Rmd`` script, you need to install ``R`` package ``CovRegFC`` and download the data from HCP server.
-
 To install ``CovRegFC``:
 
 ```
 R -e "devtools::install_github('ChristofSeiler/CovRegFC')
 ```
 
-The HCP data is available in this repository in multipart zip file. To unzip:
+Then clone this repository:
 
 ```
+git clone git@github.com:ChristofSeiler/CovRegFC_HCP.git
+```
+
+The HCP data is available in this repository as a multipart zip file. To unzip:
+
+```
+cd CovRegFC_HCP
 zip -s 0 HCP_PTN820.zip --out unsplit-HCP_PTN820.zip
 unzip unsplit-HCP_PTN820.zip
 ```
