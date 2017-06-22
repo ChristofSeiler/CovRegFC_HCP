@@ -36,14 +36,14 @@ HCP_PTN820/node_timeseries/3T_HCP820_MSMAll_d15_ts2/*.txt
 HCP_PTN820/groupICA/groupICA_3T_HCP820_MSMAll_d15.ica/melodic_IC_sum.sum/*.png
 ```
 
-To run low-dimensional model:
+To run low-dimensional model on 40 subjects (this will take about 20 to 25 minutes):
 
 ```
 R -e "rmarkdown::render('Low_Dimensional.Rmd', \
-params = list(num_regions = '15',num_subjects = 'Inf',tp_per_subject = 'Auto',num_samples = '1'))"
+params = list(num_regions = '15',num_subjects = 40,tp_per_subject = 'Auto',num_samples = '1'))"
 ```
 
-To run full model:
+To run full model (this will take about 50 to 55 minutes):
 
 ```
 R -e "rmarkdown::render('Full.Rmd',params = list(num_regions = '15'))"
