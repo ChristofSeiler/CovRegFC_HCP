@@ -32,7 +32,7 @@ library(rethinking)
 
 ## Load HCP Data
 
-Analysis based on data from all 820 subjects in the S900 data release having four complete rfMRI runs (with 100% of collected timepoints), yielding the following outputs at 6 ICA dimensionalities: Group-average parcellations yielded by group-ICA, subject-specific parcellations, subject-specific node timeseries, and a set of subject-specific parcellated connectomes. 
+Analysis based on data from all 820 subjects in the WU-Minn HCP 1200 Subjects Data Release with four complete rfMRI runs (with 100% of collected timepoints), yielding the following outputs at 6 ICA dimensionalities: Group-average parcellations via group-ICA, subject-specific parcellations, subject-specific node timeseries, and a set of subject-specific parcellated connectomes. 
 
 Load subject information and behavioral measurements.
 
@@ -179,7 +179,8 @@ N = min(scov_conventional$N,scov_short$N)
 short = c(rep(0,length(scov_conventional$N)),rep(1,length(scov_short$N)))
 X = data.frame(intercept=rep(1,length(short)),short)
 # run it in batch mode
-log_name = paste0("HCP_",num_regions)
+log_name = paste0("HCP_full_",num_regions)
+if(dir.exists(log_name)) unlink(log_name,recursive = TRUE) # cleanup
 reg = makeRegistry(id = log_name, file.dir = log_name)
 batchExport(reg, li = list(YY = YY,
                            X = X,

@@ -36,7 +36,7 @@ library(coda)
 
 ## Load HCP Data
 
-Analysis based on data from all 820 subjects in the S900 data release having four complete rfMRI runs (with 100% of collected timepoints), yielding the following outputs at 6 ICA dimensionalities: Group-average parcellations yielded by group-ICA, subject-specific parcellations, subject-specific node timeseries, and a set of subject-specific parcellated connectomes. 
+Analysis based on data from all 820 subjects in the WU-Minn HCP 1200 Subjects Data Release with four complete rfMRI runs (with 100% of collected timepoints), yielding the following outputs at 6 ICA dimensionalities: Group-average parcellations via group-ICA, subject-specific parcellations, subject-specific node timeseries, and a set of subject-specific parcellated connectomes. 
 
 Load subject information and behavioral measurements.
 
@@ -164,7 +164,7 @@ subsample_subjects = function(ts_subject_info_subset,
 
 ## Low-Dimensional Covariance Modeling
 
-We can account for correlation between the error terms of the multivariate response variable using covariance regression model. This model is very similar to "seemingly unrelated regressions" (see Zellner^[Zellner (1962), An efficient method of estimating seemingly unrelated regression equations and tests for aggregation bias, JASA.] and Greene^[Greene (2011), Econometric Analysis.]) with an additional random effects term. Repeat many times for power curve.
+We can account for correlation between the error terms of the multivariate response variable using covariance regression model. Repeat many times for power curve.
 
 ```{r}
 condition = "sleep_duration"
@@ -172,7 +172,8 @@ ts_subject_info_subset = within(ts_subject_info_subset,
                                 sleep_duration <- relevel(sleep_duration, ref = "conventional"))
 num_subjects = as.integer(params$num_subjects)
 num_samples = as.integer(params$num_samples)
-log_name = paste0("HCP_Restricted_",num_regions,"_",num_subjects,"_",tp_per_subject)
+log_name = paste0("HCP_low_",num_regions,"_",num_subjects,"_",tp_per_subject)
+if(dir.exists(log_name)) unlink(log_name,recursive = TRUE) # cleanup
 reg = makeRegistry(id = log_name, file.dir = log_name)
 batchExport(reg, li = list(channel_names = channel_names,
                            condition = condition,
