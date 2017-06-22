@@ -71,7 +71,7 @@ do
 done
 ```
 
-This will take a long time (1 to 2 days), so it might be good to run in it on a computing cluster. This will produce one ``.Rdata`` per number of subjects. To compile these files we run:
+This will take a long time (1 to 2 days), so it might be good to run in it on a computing cluster. This will produce 9 ``.Rdata`` files. Then run to plot the results:
 
 ```
 R -e "rmarkdown::render('Power.Rmd',params = list(num_regions = '15'))"
