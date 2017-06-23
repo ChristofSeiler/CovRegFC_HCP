@@ -7,3 +7,5 @@ HCP_PTN820/
 *.pdf
 
 *.html
+
+.Rhistory
