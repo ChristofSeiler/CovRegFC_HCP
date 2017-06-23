@@ -28,13 +28,12 @@ library(abind)
 library(BatchJobs)
 library(reshape2)
 library(rethinking)
+params
 ```
 
 ## Load HCP Data
 
-Analysis based on data from all 820 subjects in the WU-Minn HCP 1200 Subjects Data Release with four complete rfMRI runs (with 100% of collected timepoints), yielding the following outputs at 6 ICA dimensionalities: Group-average parcellations via group-ICA, subject-specific parcellations, subject-specific node timeseries, and a set of subject-specific parcellated connectomes. 
-
-Load subject information and behavioral measurements.
+Analysis based on data from the WU-Minn HCP 1200 Subjects Data Release with four complete rfMRI runs (with 100% of collected time points). Load subject information and behavioral measurements.
 
 ```{r}
 subject_info = read.csv("HCP_PTN820/sample_info.csv")
@@ -48,7 +47,7 @@ subject_info = subject_info[,c(
   )] 
 ```
 
-Classificatoin of sleep duration from Hirshkowitz et al. (2015)^[Hirshkowitz et al. (2015), National Sleep Foundation's sleep recommendations: Methodology and results summary, Sleep Health.]:
+Classification of sleep duration from Hirshkowitz et al. (2015)^[Hirshkowitz et al. (2015), National Sleep Foundation's sleep recommendations: Methodology and results summary, Sleep Health.]:
 
 * short sleepers: average equal or less than 6 hours each night
 * conventional sleepers: average between 7 and 9 hours each night
