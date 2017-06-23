@@ -40,7 +40,7 @@ HCP_PTN820/groupICA/groupICA_3T_HCP820_MSMAll_d15.ica/melodic_IC_sum.sum/*.png
 
 ## Low-Dimensional Model
 
-To run low-dimensional model on 80 subjects (this will take about 1 hour):
+To run low-dimensional model on 80 subjects (this will take about 1 to 2 hour):
 
 ```
 R -e "rmarkdown::render('Low_Dimensional.Rmd', \
@@ -49,7 +49,7 @@ params = list(num_regions = '15',num_subjects = '80',tp_per_subject = 'Auto',num
 
 ## Full Model
 
-To run full model (this will take about 1 hour):
+To run full model (this will take about 1 to 2 hour):
 
 ```
 R -e "rmarkdown::render('Full.Rmd',params = list(num_regions = '15'))"
